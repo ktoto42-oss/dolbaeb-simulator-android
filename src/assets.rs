@@ -14,7 +14,7 @@ impl Assets {
     // Загрузка текстур
     pub async fn load() -> Self {
         // Загрузка текстур
-        let player = load_texture("assets/player.png").await.unwrap();
+        let player = load_texture("assets/player_tileset.png").await.unwrap();
         let phone = load_texture("assets/phone.png").await.unwrap();
 
         // Загрузка шрифтов

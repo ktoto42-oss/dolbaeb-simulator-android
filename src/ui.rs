@@ -13,21 +13,21 @@ pub fn draw_main_menu(assets: &Assets, selected_idx: usize, font_idx: usize) {
 
     // Отрисовка названия
     draw_text_ex(
-        "DOLBAEB SIMULATOR", 
-        screen_width() / 2.0 - 240.0, 
-        screen_height() / 2.0 - 120.0, 
+        "DOLBAEB SIMULATOR",
+        screen_width() / 2.0 - 240.0,
+        screen_height() / 2.0 - 120.0,
         TextParams { font: Some(current_font), font_size: 50, color: RED, ..Default::default() }
     );
 
     // Варианты главного меню
     let options = ["PLAY", "SETTINGS", "EXIT"];
-    
+
     // Отрисовка вариантов
     for (i, option) in options.iter().enumerate() {
         let is_selected = i == selected_idx;
         let color = if is_selected { YELLOW } else { WHITE };
         let text = if is_selected { format!("> {}", option) } else { option.to_string() };
-        
+
         draw_text_ex(
             &text,
             screen_width() / 2.0 - 100.0,
@@ -49,9 +49,9 @@ pub fn draw_settings_menu(assets: &Assets, selected_idx: usize, font_idx: usize,
 
     // Отрисовка загаловка
     draw_text_ex(
-        "SETTINGS", 
-        screen_width() / 2.0 - 110.0, 
-        screen_height() / 2.0 - 120.0, 
+        "SETTINGS",
+        screen_width() / 2.0 - 110.0,
+        screen_height() / 2.0 - 120.0,
         TextParams { font: Some(current_font), font_size: 45, color: RED, ..Default::default() }
     );
 
@@ -72,7 +72,7 @@ pub fn draw_settings_menu(assets: &Assets, selected_idx: usize, font_idx: usize,
         let is_selected = i == selected_idx;
         let color = if is_selected { YELLOW } else { WHITE };
         let text = if is_selected { format!("> {}", option) } else { option.to_string() };
-        
+
         draw_text_ex(
             &text,
             screen_width() / 2.0 - 160.0,
@@ -89,18 +89,18 @@ pub fn draw_pause_menu(assets: &Assets, selected_idx: usize, font_idx: usize) {
 
     // Теущий шрифт
     let current_font = assets.get_font(font_idx);
-    
+
     // Полупрозрачный фон поверх замершей игры
     draw_rectangle(0.0, 0.0, screen_width(), screen_height(), Color::new(0.0, 0.0, 0.0, 0.6));
 
     // Отрисовка заголовка
     draw_text_ex(
-        "PAUSE", 
-        screen_width() / 2.0 - 65.0, 
-        screen_height() / 2.0 - 120.0, 
+        "PAUSE",
+        screen_width() / 2.0 - 65.0,
+        screen_height() / 2.0 - 120.0,
         TextParams { font: Some(current_font), font_size: 45, color: YELLOW, ..Default::default() }
     );
-    
+
     // Варианты в паузе
     let options = ["RESUME", "SETTINGS", "TO MAIN MENU"];
 
@@ -109,7 +109,7 @@ pub fn draw_pause_menu(assets: &Assets, selected_idx: usize, font_idx: usize) {
         let is_selected = i == selected_idx;
         let color = if is_selected { YELLOW } else { WHITE };
         let text = if is_selected { format!("> {}", option) } else { option.to_string() };
-        
+
         draw_text_ex(
             &text,
             screen_width() / 2.0 - 130.0,
@@ -119,7 +119,7 @@ pub fn draw_pause_menu(assets: &Assets, selected_idx: usize, font_idx: usize) {
     }
 }
 
-// Отрисовка интерфейса (пока занлушка)
+// Отрисовка интерфейса (пока заглушка)
 pub fn draw_ui() {
     set_default_camera();
 }

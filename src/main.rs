@@ -1,5 +1,7 @@
 use macroquad::prelude::*;
 use crate::world::{APT_HEIGHT, APT_WIDTH, STREET_HEIGHT, STREET_WIDTH, GameState};
+use crate::player::Player;
+use crate::npc::Enemy;
 
 // Игрок
 mod player;
@@ -7,13 +9,13 @@ mod player;
 // Мир
 mod world;
 
-// Интерфейс 
+// Интерфейс
 mod ui;
 
 // Текстуры
 mod assets;
 
-// ОбЪекты
+// Объекты
 mod objects;
 
 // NPC
@@ -27,14 +29,9 @@ async fn main() {
     // Камера
     let mut camera = Camera2D::default();
     camera.zoom = vec2(2.0 / screen_width(), 2.0 / screen_height());
-    
+
     // Инициализация игрока
-    let mut player = player::Player {
-        x: APT_WIDTH / 2.0,
-        y: APT_HEIGHT / 2.0,
-        speed: 200.0,
-        rotation: 0.0,
-    };
+    let mut player = Player::new(0.0, 0.0, 300.0);
 
     // Спавн телефона
     let mut phone = objects::Phone {
@@ -42,23 +39,16 @@ async fn main() {
         is_get: false,
     };
 
-    // Спавн врага
-    let mut enemy = npc::Enemy {
-        x: 200.0,
-        y: 400.0,
-        speed_patrol: 80.0,
-        speed_chase: 160.0,
-        rotation: 0.0,
-        state: npc::EnemyState::Patrol,
-        patrol_min_x: 0.0,
-        patrol_max_x: 400.0,
-        direction: 1.0,
-        vision_radius: 250.0,
-    };
+    let enemyes = [
+        [100.0, 100.0],
+        [300.0, 300.0],
+        [500.0, 500.0],
+    ];
+    let mut enemy = Enemy::new(enemyes[0]);
 
-    // Состояние (в меня по дефолту)
+    // Состояние
     let mut state = GameState::MainMenu;
-    
+
     // Флаг паузы
     let mut is_paused = false;
 
@@ -79,14 +69,14 @@ async fn main() {
 
     // Главный игровой цикл
     loop {
-        // Дельта времени (чтобы игра работала одинаково при разно фпс)
+        // Дельта времени (чтобы игра работала одинаково при разном фпс)
         let delta_time = get_frame_time();
 
         match state {
             GameState::MainMenu => {
                 // Отрисовка меню
                 ui::draw_main_menu(&assets, menu_idx, font_idx);
-                
+
                 // Навигация (W - вверх S - вниз)
                 if is_key_pressed(KeyCode::W) {
                     menu_idx = if menu_idx == 0 { 2 } else { menu_idx - 1 };
@@ -100,9 +90,9 @@ async fn main() {
                     match menu_idx {
                         0 => { state = GameState::InApartment; } // Старт игры
                         1 => { // В настройки
-                            previous_state = GameState::MainMenu; 
-                            state = GameState::Settings; 
-                            settings_idx = 0; 
+                            previous_state = GameState::MainMenu;
+                            state = GameState::Settings;
+                            settings_idx = 0;
                         }
                         2 => { break; } // Выход
                         _ => {}
@@ -132,7 +122,7 @@ async fn main() {
                         }
                         1 => {
                             // Выключение звука
-                            sound_on = !sound_on; 
+                            sound_on = !sound_on;
                         }
                         2 => {
                             // Переключение шрифта
@@ -152,7 +142,7 @@ async fn main() {
                 }
             }
 
-            _ => {                
+            _ => {
                 // Нажатие ESC вызывает или закрывает паузу
                 if is_key_pressed(KeyCode::Escape) {
                     is_paused = !is_paused;
@@ -171,16 +161,16 @@ async fn main() {
                         pause_idx = if pause_idx == 2 { 0 } else { pause_idx + 1 };
                     }
 
-                    // Подтверждение 
+                    // Подтверждение
                     if is_key_pressed(KeyCode::Enter) {
                         match pause_idx {
                             0 => { is_paused = false; } // Продолжить
-                            1 => { 
+                            1 => {
                                 previous_state = state; // Текущая локация
                                 state = GameState::Settings; // Переключение на настройки
                                 settings_idx = 0;
                             }
-                            2 => { 
+                            2 => {
                                 // Выход в главное меню
                                 state = GameState::MainMenu;
                                 is_paused = false;
@@ -204,11 +194,12 @@ async fn main() {
                     player.location_restriction(&state);
                     phone.update(delta_time);
                     enemy.update(&player, delta_time);
+
                     world::handle_location_switch(&mut state, &mut player);
                     camera.target = vec2(player.x, player.y);
                 }
 
-                // Отрисовка мира 
+                // Отрисовка мира
                 let target_visible_height = 600.0;
                 let zoom_y = 2.0 / target_visible_height;
                 let zoom_x = zoom_y * (screen_height() / screen_width());
@@ -224,7 +215,7 @@ async fn main() {
                 // Статичный интерфейс
                 ui::draw_ui();
                 phone.draw(&assets, font_idx);
-                
+
                 // Повторыный вызов паузы чтобы она перекрывала интерфейс
                 if is_paused {
                     ui::draw_pause_menu(&assets, pause_idx, font_idx);
@@ -234,5 +225,3 @@ async fn main() {
         next_frame().await
     }
 }
-
-

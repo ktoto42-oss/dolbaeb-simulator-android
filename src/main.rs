@@ -1,7 +1,8 @@
-use macroquad::prelude::*;
-use crate::world::{APT_HEIGHT, APT_WIDTH, STREET_HEIGHT, STREET_WIDTH, GameState};
-use crate::player::Player;
 use crate::npc::Enemy;
+use crate::objects::DroppedWeapon;
+use crate::player::{Player, Weapon};
+use crate::world::GameState;
+use macroquad::prelude::*;
 
 // Игрок
 mod player;
@@ -21,10 +22,14 @@ mod objects;
 // NPC
 mod npc;
 
+// Тайл карта
+mod tilemap;
+
 #[macroquad::main("Dolbaeb simulator")]
 async fn main() {
     // Загрузка текстур
-    let assets = assets::Assets::load().await;
+    let assets = assets::Assets::load();
+    let mut world_manager = tilemap::WorldManager::init(1.0);
 
     // Камера
     let mut camera = Camera2D::default();
@@ -39,18 +44,14 @@ async fn main() {
         is_get: false,
     };
 
-    let enemyes = [
-        [100.0, 100.0],
-        [300.0, 300.0],
-        [500.0, 500.0],
+    let mut enemies = vec![
+        Enemy::new(vec2(200.0, 100.0), Weapon::Pipe, vec2(1.0, 0.0)),
+        Enemy::new(vec2(400.0, 150.0), Weapon::Pistol, vec2(0.0, 1.0)),
+        Enemy::new(vec2(500.0, 300.0), Weapon::Rifle, vec2(0.0, 0.0)),
+        Enemy::new(vec2(300.0, 400.0), Weapon::Knight, vec2(-1.0, 0.0)),
     ];
-    let mut enemy = Enemy::new(enemyes[0]);
 
-    // Состояние
-    let mut state = GameState::MainMenu;
-
-    // Флаг паузы
-    let mut is_paused = false;
+    let mut dropped_weapons: Vec<DroppedWeapon> = Vec::new();
 
     // Состояния меню и настроек
     let mut state = GameState::MainMenu;
@@ -88,13 +89,18 @@ async fn main() {
                 // Подтверждение
                 if is_key_pressed(KeyCode::Enter) {
                     match menu_idx {
-                        0 => { state = GameState::InApartment; } // Старт игры
-                        1 => { // В настройки
+                        0 => {
+                            state = GameState::InApartment;
+                        } // Старт игры
+                        1 => {
+                            // В настройки
                             previous_state = GameState::MainMenu;
                             state = GameState::Settings;
                             settings_idx = 0;
                         }
-                        2 => { break; } // Выход
+                        2 => {
+                            break;
+                        } // Выход
                         _ => {}
                     }
                 }
@@ -106,10 +112,18 @@ async fn main() {
 
                 // Навигация в настройках
                 if is_key_pressed(KeyCode::W) {
-                    settings_idx = if settings_idx == 0 { 3 } else { settings_idx - 1 };
+                    settings_idx = if settings_idx == 0 {
+                        3
+                    } else {
+                        settings_idx - 1
+                    };
                 }
                 if is_key_pressed(KeyCode::S) {
-                    settings_idx = if settings_idx == 3 { 0 } else { settings_idx + 1 };
+                    settings_idx = if settings_idx == 3 {
+                        0
+                    } else {
+                        settings_idx + 1
+                    };
                 }
 
                 // Подтверждение
@@ -151,36 +165,34 @@ async fn main() {
 
                 // Отработка паузы
                 if is_paused {
-                    ui::draw_pause_menu(&assets, pause_idx, font_idx);
-
                     // Навигация в паузе
                     if is_key_pressed(KeyCode::W) {
-                        pause_idx = if pause_idx == 0 { 2 } else { pause_idx - 1 };
+                        pause_idx = if pause_idx == 0 { 3 } else { pause_idx - 1 };
                     }
                     if is_key_pressed(KeyCode::S) {
-                        pause_idx = if pause_idx == 2 { 0 } else { pause_idx + 1 };
+                        pause_idx = if pause_idx == 3 { 0 } else { pause_idx + 1 };
                     }
 
                     // Подтверждение
                     if is_key_pressed(KeyCode::Enter) {
                         match pause_idx {
-                            0 => { is_paused = false; } // Продолжить
+                            0 => {
+                                is_paused = false;
+                            } // Продолжить
                             1 => {
+                                player.restart();
+                                is_paused = false;
+                            }
+                            2 => {
                                 previous_state = state; // Текущая локация
                                 state = GameState::Settings; // Переключение на настройки
                                 settings_idx = 0;
                             }
-                            2 => {
+                            3 => {
                                 // Выход в главное меню
                                 state = GameState::MainMenu;
                                 is_paused = false;
                                 menu_idx = 0;
-
-                                player.x = APT_WIDTH / 2.0;
-                                player.y = APT_HEIGHT / 2.0;
-                                enemy.x = 200.0;
-                                enemy.y = 400.0;
-                                enemy.state = npc::EnemyState::Patrol;
                             }
                             _ => {}
                         }
@@ -189,13 +201,21 @@ async fn main() {
 
                 // Обновление игры
                 if !is_paused {
-                    player.handle_input(delta_time);
+                    player.handle_input(delta_time, &world_manager, &camera, &mut dropped_weapons);
                     player.update_rotation(&camera);
-                    player.location_restriction(&state);
+                    player.location_restriction(world_manager.get_active());
+                    world_manager.update_flow_field(vec2(player.x, player.y));
+                    player.update_bullets(world_manager.get_active(), delta_time);
                     phone.update(delta_time);
-                    enemy.update(&player, delta_time);
-
-                    world::handle_location_switch(&mut state, &mut player);
+                    for enemy in &mut enemies {
+                        enemy.update(
+                            &mut player,
+                            &world_manager,
+                            &mut dropped_weapons,
+                            delta_time,
+                        );
+                    }
+                    world::handle_location_switch(&mut state, &mut world_manager);
                     camera.target = vec2(player.x, player.y);
                 }
 
@@ -208,13 +228,28 @@ async fn main() {
                 clear_background(world::get_bg_color(&state));
 
                 set_camera(&camera);
-                world::draw_world(&state);
-                enemy.draw(&state);
+
+                world_manager.draw();
+                player.draw_bullets();
+                for enemy in &enemies {
+                    enemy.draw(&assets);
+                }
+                for item in &dropped_weapons {
+                    item.draw(&assets);
+                }
+
                 player.draw(&assets);
 
                 // Статичный интерфейс
-                ui::draw_ui();
+                ui::draw_ui(&assets, font_idx, &player);
                 phone.draw(&assets, font_idx);
+
+                if player.is_dead {
+                    ui::draw_dead_menu(&assets, font_idx);
+                    if is_key_pressed(KeyCode::R) {
+                        player.restart();
+                    }
+                }
 
                 // Повторыный вызов паузы чтобы она перекрывала интерфейс
                 if is_paused {

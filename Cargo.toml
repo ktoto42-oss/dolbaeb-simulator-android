@@ -4,12 +4,19 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-macroquad = "0.4.15"
-macroquad-tiled = "0.2.1"
+macroquad = { version = "0.4", features = ["audio"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
 [profile.release]
 opt-level = 3
-lto = true
-panic = 'abort'
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[package.metadata.appimage]
+assets = ["assets"]

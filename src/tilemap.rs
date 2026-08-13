@@ -1,5 +1,4 @@
 use macroquad::prelude::*;
-use macroquad_tiled as tiled;
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 
@@ -7,16 +6,17 @@ use std::collections::BinaryHeap;
 pub enum MapId {
     House = 0,
     Street = 1,
-    Level1_1 = 2,
-    Level1_2 = 3,
-    Level2_1 = 4,
-    Level2_2 = 5,
-    Level2_3 = 6,
+    //Level1_1 = 2,
+    //Level1_2 = 3,
+    //Level2_1 = 4,
+    //Level2_2 = 5,
+    //Level2_3 = 6,
 }
 
 struct MapConfig {
     json_str: &'static str,
     atlas_bytes: &'static [u8],
+    texture_bytes: &'static [u8],
     width: usize,
     height: usize,
     tile_w: f32,
@@ -25,7 +25,6 @@ struct MapConfig {
 
 pub struct TilemapManager {
     bg_texture: Texture2D,
-    map: tiled::Map,
     map_rect: Rect,
     collision_grid: Box<[bool]>,
     cost_map: Vec<u16>,
@@ -39,14 +38,12 @@ pub struct TilemapManager {
 }
 
 impl TilemapManager {
-    fn load(config: &MapConfig, scale: f32, bg_bytes: &[u8]) -> Self {
-        let bg_texture = Texture2D::from_file_with_format(bg_bytes, None);
+    fn load(config: &MapConfig, scale: f32) -> Self {
+        let bg_texture = Texture2D::from_file_with_format(config.texture_bytes, None);
         bg_texture.set_filter(FilterMode::Nearest);
 
         let texture = Texture2D::from_file_with_format(config.atlas_bytes, None);
         texture.set_filter(FilterMode::Nearest);
-
-        let map = tiled::load_map(config.json_str, &[("tileset.png", texture)], &[]).unwrap();
 
         let map_w = config.width as f32 * config.tile_w * scale;
         let map_h = config.height as f32 * config.tile_h * scale;
@@ -118,7 +115,6 @@ impl TilemapManager {
 
         Self {
             bg_texture,
-            map,
             map_rect,
             collision_grid: collision_grid.into_boxed_slice(),
             cost_map,
@@ -326,56 +322,57 @@ impl TilemapManager {
 }
 
 pub struct WorldManager {
-    maps: [TilemapManager; 2],
+    maps: [Option<TilemapManager>; 2],
     current_map: MapId,
 }
 
+const CONFIGS: [MapConfig; 2] = [
+    MapConfig {
+        json_str: include_str!("../assets/house.json"),
+        atlas_bytes: include_bytes!("../assets/tileset.png"),
+        texture_bytes: include_bytes!("../assets/house.png"),
+        width: 20,
+        height: 20,
+        tile_w: 16.0,
+        tile_h: 16.0,
+    },
+    MapConfig {
+        json_str: include_str!("../assets/street.json"),
+        atlas_bytes: include_bytes!("../assets/tileset.png"),
+        texture_bytes: include_bytes!("../assets/street.png"),
+        width: 200,
+        height: 200,
+        tile_w: 48.0,
+        tile_h: 48.0,
+    },
+];
+
 impl WorldManager {
     pub fn init(scale: f32) -> Self {
-        let configs = [
-            MapConfig {
-                json_str: include_str!("../assets/house.json"),
-                atlas_bytes: include_bytes!("../assets/tileset.png"),
-                width: 50,
-                height: 50,
-                tile_w: 48.0,
-                tile_h: 48.0,
-            },
-            MapConfig {
-                json_str: include_str!("../assets/street.json"),
-                atlas_bytes: include_bytes!("../assets/tileset.png"),
-                width: 200,
-                height: 200,
-                tile_w: 48.0,
-                tile_h: 48.0,
-            },
-        ];
-
-        let home_bytes = include_bytes!("../assets/house.png");
-        let street_bytes = include_bytes!("../assets/street.png");
-
-        let maps = [
-            TilemapManager::load(&configs[0], scale, home_bytes),
-            TilemapManager::load(&configs[1], scale, street_bytes),
-        ];
+        let house_map = TilemapManager::load(&CONFIGS[0], scale);
 
         Self {
-            maps,
+            maps: [Some(house_map), None],
             current_map: MapId::House,
         }
     }
 
     pub fn switch_to(&mut self, map_id: MapId) {
+        let idx = map_id as usize;
+        if self.maps[idx].is_none() {
+            self.maps[idx] = Some(TilemapManager::load(&CONFIGS[idx], 2.4));
+        }
+
         self.current_map = map_id;
         self.get_active_mut().last_target_tile = (usize::MAX, usize::MAX);
     }
 
     pub fn get_active(&self) -> &TilemapManager {
-        &self.maps[self.current_map as usize]
+        self.maps[self.current_map as usize].as_ref().unwrap()
     }
 
     pub fn get_active_mut(&mut self) -> &mut TilemapManager {
-        &mut self.maps[self.current_map as usize]
+        self.maps[self.current_map as usize].as_mut().unwrap()
     }
 
     pub fn update_flow_field(&mut self, target_pos: Vec2) {

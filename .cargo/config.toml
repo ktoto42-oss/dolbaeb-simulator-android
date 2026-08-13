@@ -13,3 +13,6 @@
 
 #[profile.dev.package."*"]
 #codegen-backend = "llvm"
+
+[target.wasm32-unknown-unknown]
+rustflags = ["-C", "link-arg=--allow-undefined"]

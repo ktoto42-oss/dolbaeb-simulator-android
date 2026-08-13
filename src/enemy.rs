@@ -1,45 +1,13 @@
 use crate::assets::Assets;
 use crate::objects::{Bullet, DroppedWeapon};
 use crate::player::{AnimationState, Player, Weapon};
+use crate::player::{
+    LEGS_FRAMES, LEGS_ROW, PUNCH_ROW, SCALE, SCALED_SIZE, SPRITE_OFFSET_X, SPRITE_OFFSET_Y,
+    SPRITE_SIZE,
+};
 use crate::tilemap::{TilemapManager, WorldManager};
+use macroquad::audio::play_sound_once;
 use macroquad::prelude::*;
-
-// Настройка спрайтов и смещения центра
-const SPRITE_SIZE: f32 = 48.0;
-const SCALE: f32 = 3.0;
-const SCALED_SIZE: f32 = SPRITE_SIZE * SCALE;
-
-// Сдвиг текстур (тайлсет кривой что пиздец)
-const SPRITE_OFFSET_X: f32 = 4.0;
-const SPRITE_OFFSET_Y: f32 = 0.0;
-
-// Константы строк и кадров для тайлсета
-// Кулаки
-const PUNCH_ROW: usize = 0;
-const PUNCH_FRAMES: usize = 7;
-
-// Труба
-const PIPE_ROW: usize = 1;
-const PIPE_FRAMES: usize = 7;
-
-// Нож
-const KNIGHT_ROW: usize = 2;
-const KNIGHT_FRAMES: usize = 5;
-
-// Пистолет
-const PISTOL_ROW: usize = 3;
-const PISTOL_FRAMES: usize = 2;
-
-// Автомат
-const RIFLE_ROW: usize = 4;
-const RIFLE_FRAMES: usize = 2;
-
-// Ноги
-const LEGS_ROW: usize = 5;
-const LEGS_FRAMES: usize = 7;
-
-const DEAD_ROW: usize = 6;
-const DEAD_FRAMES: usize = 1;
 
 // Состояния
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -55,7 +23,6 @@ pub struct Enemy {
     pub y: f32,
     pub speed: f32,
     pub rotation: f32,
-    pub width: f32,
     pub torso_anim: AnimationState,
     pub legs_anim: AnimationState,
     pub weapon: Weapon,
@@ -82,7 +49,6 @@ impl Enemy {
             y: pos.y,
             speed: 180.0,
             rotation: initial_rot,
-            width: 32.0,
             torso_anim: AnimationState::new(1, 1.0, PUNCH_ROW),
             legs_anim: AnimationState::new(LEGS_FRAMES, 14.0, LEGS_ROW),
             weapon,
@@ -97,7 +63,10 @@ impl Enemy {
     }
 
     pub fn collider(&self) -> Rect {
-        Rect::new(self.x - 16.0, self.y - 16.0, 32.0, 32.0)
+        let width = 36.0;
+        let height = 36.0;
+
+        Rect::new(self.x - width / 2.0, self.y, width, height)
     }
 
     pub fn update(
@@ -106,6 +75,7 @@ impl Enemy {
         world_manager: &WorldManager,
         dropped_weapons: &mut Vec<DroppedWeapon>,
         dt: f32,
+        assets: &Assets,
     ) {
         let active_map = world_manager.get_active();
         let player_rect = player.collider();
@@ -134,7 +104,6 @@ impl Enemy {
         let mut hit_by_player_bullet = false;
         let enemy_pos = vec2(self.x, self.y);
         let player_pos = vec2(player.x, player.y);
-        let dist_to_player = enemy_pos.distance(player_pos);
 
         player.bullets.retain(|b| {
             if !hit_by_player_bullet && b.collider().overlaps(&enemy_rect) {
@@ -151,11 +120,16 @@ impl Enemy {
         }
 
         let dist_to_player = vec2(self.x, self.y).distance(vec2(player.x, player.y));
-        let is_player_melee = player.current_weapon != Weapon::Pistol
-            && player.current_weapon != Weapon::Rifle
-            && player.current_weapon != Weapon::Dead;
+        let is_player_melee = player.weapon != Weapon::Pistol
+            && player.weapon != Weapon::Rifle
+            && player.weapon != Weapon::Dead;
 
         if player.is_attacking && is_player_melee && dist_to_player < player.atack_radius {
+            match player.weapon {
+                Weapon::Knife => play_sound_once(&assets.sound_knife),
+                Weapon::Pipe | Weapon::Fists => play_sound_once(&assets.sound_pipe),
+                _ => {}
+            }
             self.die(dropped_weapons);
             return;
         }
@@ -227,7 +201,17 @@ impl Enemy {
                 }
 
                 if dist_to_player < 80.0 {
-                    self.is_attacking = true;
+                    if !self.is_attacking {
+                        self.is_attacking = true;
+                        play_sound_once(&assets.sound_swosh);
+                        match self.weapon {
+                            Weapon::Knife => play_sound_once(&assets.sound_knife),
+                            Weapon::Pipe | Weapon::Fists => play_sound_once(&assets.sound_pipe),
+                            _ => {}
+                        }
+                        let (row, frames, fps) = self.weapon.anim_info();
+                        self.torso_anim.set_state(row, frames, fps);
+                    }
                     player.is_dead = true;
                 }
             }
@@ -244,6 +228,11 @@ impl Enemy {
 
                 if self.shoot_cooldown <= 0.0 {
                     self.is_attacking = true;
+                    match self.weapon {
+                        Weapon::Rifle => play_sound_once(&assets.sound_ak47),
+                        Weapon::Pistol => play_sound_once(&assets.sound_pistol),
+                        _ => {}
+                    }
                     self.bullets.push(Bullet::new(enemy_pos, dir_to_player));
                     self.shoot_cooldown = match self.weapon {
                         Weapon::Rifle => 0.18,
@@ -258,14 +247,7 @@ impl Enemy {
         }
 
         if !self.is_attacking {
-            let (row, frames, fps) = match self.weapon {
-                Weapon::Fists => (PUNCH_ROW, PUNCH_FRAMES, 14.0),
-                Weapon::Pipe => (PIPE_ROW, PIPE_FRAMES, 14.0),
-                Weapon::Knight => (KNIGHT_ROW, KNIGHT_FRAMES, 12.0),
-                Weapon::Pistol => (PISTOL_ROW, PISTOL_FRAMES, 12.0),
-                Weapon::Rifle => (RIFLE_ROW, RIFLE_FRAMES, 14.0),
-                Weapon::Dead => (DEAD_ROW, DEAD_FRAMES, 14.0),
-            };
+            let (row, frames, fps) = self.weapon.anim_info();
             self.torso_anim.set_state(row, frames, fps);
         }
 
@@ -282,14 +264,7 @@ impl Enemy {
                     self.torso_anim.reset();
                 } else {
                     self.is_attacking = false;
-                    let row = match self.weapon {
-                        Weapon::Fists => PUNCH_ROW,
-                        Weapon::Pipe => PIPE_ROW,
-                        Weapon::Knight => KNIGHT_ROW,
-                        Weapon::Pistol => PISTOL_ROW,
-                        Weapon::Rifle => RIFLE_ROW,
-                        Weapon::Dead => DEAD_ROW,
-                    };
+                    let row = self.weapon.anim_info().0;
                     self.torso_anim.set_state(row, 1, 1.0);
                 }
             }
@@ -325,8 +300,8 @@ impl Enemy {
 
         if self.weapon != Weapon::Fists && self.weapon != Weapon::Dead {
             let ammo = match self.weapon {
-                Weapon::Pistol => 6,
-                Weapon::Rifle => 15,
+                Weapon::Pistol => 12,
+                Weapon::Rifle => 30,
                 _ => 0,
             };
 
@@ -340,14 +315,7 @@ impl Enemy {
 
         self.weapon = Weapon::Dead;
 
-        let (row, frames, fps) = match self.weapon {
-            Weapon::Fists => (PUNCH_ROW, PUNCH_FRAMES, 14.0),
-            Weapon::Pipe => (PIPE_ROW, PIPE_FRAMES, 14.0),
-            Weapon::Knight => (KNIGHT_ROW, KNIGHT_FRAMES, 12.0),
-            Weapon::Pistol => (PISTOL_ROW, PISTOL_FRAMES, 12.0),
-            Weapon::Rifle => (RIFLE_ROW, RIFLE_FRAMES, 14.0),
-            Weapon::Dead => (DEAD_ROW, DEAD_FRAMES, 14.0),
-        };
+        let (row, frames, fps) = self.weapon.anim_info();
         self.torso_anim.set_state(row, frames, fps);
     }
 

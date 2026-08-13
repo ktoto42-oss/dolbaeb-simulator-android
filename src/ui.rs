@@ -53,13 +53,7 @@ pub fn draw_main_menu(assets: &Assets, selected_idx: usize, font_idx: usize) {
 }
 
 // Отрисовка меню настроек
-pub fn draw_settings_menu(
-    assets: &Assets,
-    selected_idx: usize,
-    font_idx: usize,
-    fullscreen: bool,
-    sound_on: bool,
-) {
+pub fn draw_settings_menu(assets: &Assets, selected_idx: usize, font_idx: usize, fullscreen: bool) {
     // Фиксация камеры
     set_default_camera();
     // Отчистка фона
@@ -82,13 +76,11 @@ pub fn draw_settings_menu(
     );
 
     let screen_str = if fullscreen { "FULL SCREEN" } else { "WINDOW" };
-    let sound_str = if sound_on { "ON" } else { "OFF" };
     let font_name = assets.get_font_name(font_idx);
 
     // Варианты в настройках
     let options = [
         format!("SCREEN MODE: {}", screen_str),
-        format!("VOLUME: {}", sound_str),
         format!("FONT: {}", font_name),
         "BACK".to_string(),
     ];
@@ -210,14 +202,14 @@ pub fn draw_ui(assets: &Assets, font_idx: usize, player: &Player) {
 
     let current_font = assets.get_font(font_idx);
 
-    if player.current_weapon == Weapon::Pistol || player.current_weapon == Weapon::Rifle {
+    if player.weapon == Weapon::Pistol || player.weapon == Weapon::Rifle {
         draw_text_ex(
             &format!("AMMO: {}", player.ammo),
-            screen_width() - 150.0,
-            screen_height() - 30.0,
+            screen_width() - 200.0,
+            screen_height() - 50.0,
             TextParams {
                 font: Some(current_font),
-                font_size: 28,
+                font_size: 32,
                 color: YELLOW,
                 ..Default::default()
             },

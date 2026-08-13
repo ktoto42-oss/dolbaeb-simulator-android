@@ -1,4 +1,4 @@
-use crate::npc::Enemy;
+use crate::enemy::Enemy;
 use crate::objects::DroppedWeapon;
 use crate::player::{Player, Weapon};
 use crate::world::GameState;
@@ -20,23 +20,34 @@ mod assets;
 mod objects;
 
 // NPC
-mod npc;
+mod enemy;
 
 // Тайл карта
 mod tilemap;
 
-#[macroquad::main("Dolbaeb simulator")]
+fn window_conf() -> Conf {
+    Conf {
+        window_title: "Dolbaeb Simulator".to_string(),
+        platform: miniquad::conf::Platform {
+            linux_backend: miniquad::conf::LinuxBackend::WaylandWithX11Fallback,
+            ..Default::default()
+        },
+        ..Default::default()
+    }
+}
+
+#[macroquad::main(window_conf)]
 async fn main() {
     // Загрузка текстур
-    let assets = assets::Assets::load();
-    let mut world_manager = tilemap::WorldManager::init(1.0);
+    let assets = assets::Assets::load().await;
+    let mut world_manager = tilemap::WorldManager::init(2.4);
 
     // Камера
     let mut camera = Camera2D::default();
     camera.zoom = vec2(2.0 / screen_width(), 2.0 / screen_height());
 
     // Инициализация игрока
-    let mut player = Player::new(0.0, 0.0, 300.0);
+    let mut player = Player::new(650.0, 650.0, 300.0);
 
     // Спавн телефона
     let mut phone = objects::Phone {
@@ -45,10 +56,10 @@ async fn main() {
     };
 
     let mut enemies = vec![
-        Enemy::new(vec2(200.0, 100.0), Weapon::Pipe, vec2(1.0, 0.0)),
-        Enemy::new(vec2(400.0, 150.0), Weapon::Pistol, vec2(0.0, 1.0)),
-        Enemy::new(vec2(500.0, 300.0), Weapon::Rifle, vec2(0.0, 0.0)),
-        Enemy::new(vec2(300.0, 400.0), Weapon::Knight, vec2(-1.0, 0.0)),
+        Enemy::new(vec2(200.0, 100.0), Weapon::Pistol, vec2(1.0, 0.0)),
+        Enemy::new(vec2(400.0, 150.0), Weapon::Rifle, vec2(0.0, 1.0)),
+        Enemy::new(vec2(500.0, 300.0), Weapon::Fists, vec2(0.0, 0.0)),
+        Enemy::new(vec2(300.0, 400.0), Weapon::Knife, vec2(-1.0, 0.0)),
     ];
 
     let mut dropped_weapons: Vec<DroppedWeapon> = Vec::new();
@@ -65,7 +76,6 @@ async fn main() {
 
     // Текущие настройки (флаги)
     let mut fullscreen = false;
-    let mut sound_on = true;
     let mut font_idx = 0;
 
     // Главный игровой цикл
@@ -108,7 +118,7 @@ async fn main() {
 
             GameState::Settings => {
                 // Отрисовка настроек
-                ui::draw_settings_menu(&assets, settings_idx, font_idx, fullscreen, sound_on);
+                ui::draw_settings_menu(&assets, settings_idx, font_idx, fullscreen);
 
                 // Навигация в настройках
                 if is_key_pressed(KeyCode::W) {
@@ -135,14 +145,10 @@ async fn main() {
                             set_fullscreen(fullscreen);
                         }
                         1 => {
-                            // Выключение звука
-                            sound_on = !sound_on;
-                        }
-                        2 => {
                             // Переключение шрифта
                             font_idx = if font_idx == 3 { 0 } else { font_idx + 1 };
                         }
-                        3 => {
+                        2 => {
                             // Возвращение туда откуда вызванно
                             state = previous_state;
                         }
@@ -201,7 +207,13 @@ async fn main() {
 
                 // Обновление игры
                 if !is_paused {
-                    player.handle_input(delta_time, &world_manager, &camera, &mut dropped_weapons);
+                    player.handle_input(
+                        delta_time,
+                        &world_manager,
+                        &camera,
+                        &mut dropped_weapons,
+                        &assets,
+                    );
                     player.update_rotation(&camera);
                     player.location_restriction(world_manager.get_active());
                     world_manager.update_flow_field(vec2(player.x, player.y));
@@ -213,9 +225,10 @@ async fn main() {
                             &world_manager,
                             &mut dropped_weapons,
                             delta_time,
+                            &assets,
                         );
                     }
-                    world::handle_location_switch(&mut state, &mut world_manager);
+                    world::handle_location_switch(&mut state, &mut world_manager, &mut player);
                     camera.target = vec2(player.x, player.y);
                 }
 

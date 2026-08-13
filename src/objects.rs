@@ -39,14 +39,14 @@ impl DroppedWeapon {
     pub fn draw(&self, assets: &Assets) {
         let sprite_idx = match self.weapon {
             Weapon::Pipe => 0.0,
-            Weapon::Knight => 1.0,
+            Weapon::Knife => 1.0,
             Weapon::Pistol => 2.0,
             Weapon::Rifle => 3.0,
             _ => return,
         };
 
         let frame_size = 48.0;
-        let scale = 2.5;
+        let scale = 2.4;
         let scaled_size = frame_size * scale;
 
         draw_texture_ex(
@@ -114,7 +114,7 @@ impl Bullet {
         Self {
             pos,
             dir: dir.normalize_or_zero(),
-            speed: 2000.0,
+            speed: 3000.0,
             lifetime: 1.5,
         }
     }
@@ -125,10 +125,10 @@ impl Bullet {
     }
 
     pub fn collider(&self) -> Rect {
-        Rect::new(self.pos.x - 2.0, self.pos.y - 2.0, 4.0, 4.0)
+        Rect::new(self.pos.x - 2.0, self.pos.y - 2.0, 3.0, 3.0)
     }
 
     pub fn draw(&self) {
-        draw_circle(self.pos.x, self.pos.y, 3.0, YELLOW);
+        draw_circle(self.pos.x, self.pos.y, 2.0, YELLOW);
     }
 }

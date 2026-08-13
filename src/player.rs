@@ -1,55 +1,68 @@
 use crate::assets::Assets;
-use crate::npc::Enemy;
 use crate::objects::{Bullet, DroppedWeapon};
 use crate::tilemap::{TilemapManager, WorldManager};
+use macroquad::audio::play_sound_once;
 use macroquad::prelude::*;
 
 // Настройка спрайтов и смещения центра
-const SPRITE_SIZE: f32 = 48.0;
-const SCALE: f32 = 3.0;
-const SCALED_SIZE: f32 = SPRITE_SIZE * SCALE;
+pub const SPRITE_SIZE: f32 = 48.0;
+pub const SCALE: f32 = 2.4;
+pub const SCALED_SIZE: f32 = SPRITE_SIZE * SCALE;
 
 // Сдвиг текстур (тайлсет кривой что пиздец)
-const SPRITE_OFFSET_X: f32 = 4.0;
-const SPRITE_OFFSET_Y: f32 = 0.0;
+pub const SPRITE_OFFSET_X: f32 = 4.0;
+pub const SPRITE_OFFSET_Y: f32 = 0.0;
 
 // Константы строк и кадров для тайлсета
 // Кулаки
-const PUNCH_ROW: usize = 0;
-const PUNCH_FRAMES: usize = 7;
+pub const PUNCH_ROW: usize = 0;
+pub const PUNCH_FRAMES: usize = 7;
 
 // Труба
-const PIPE_ROW: usize = 1;
-const PIPE_FRAMES: usize = 7;
+pub const PIPE_ROW: usize = 1;
+pub const PIPE_FRAMES: usize = 7;
 
 // Нож
-const KNIGHT_ROW: usize = 2;
-const KNIGHT_FRAMES: usize = 5;
+pub const KNIFE_ROW: usize = 2;
+pub const KNIFE_FRAMES: usize = 5;
 
 // Пистолет
-const PISTOL_ROW: usize = 3;
-const PISTOL_FRAMES: usize = 2;
+pub const PISTOL_ROW: usize = 3;
+pub const PISTOL_FRAMES: usize = 2;
 
 // Автомат
-const RIFLE_ROW: usize = 4;
-const RIFLE_FRAMES: usize = 2;
+pub const RIFLE_ROW: usize = 4;
+pub const RIFLE_FRAMES: usize = 2;
 
 // Ноги
-const LEGS_ROW: usize = 5;
-const LEGS_FRAMES: usize = 7;
+pub const LEGS_ROW: usize = 5;
+pub const LEGS_FRAMES: usize = 7;
 
-const DEAD_ROW: usize = 6;
-const DEAD_FRAMES: usize = 1;
+pub const DEAD_ROW: usize = 6;
+pub const DEAD_FRAMES: usize = 1;
 
 // Всё оружие
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Weapon {
     Fists,
     Pipe,
-    Knight,
+    Knife,
     Pistol,
     Rifle,
     Dead,
+}
+
+impl Weapon {
+    pub fn anim_info(&self) -> (usize, usize, f32) {
+        match self {
+            Weapon::Fists => (PUNCH_ROW, PUNCH_FRAMES, 14.0),
+            Weapon::Pipe => (PIPE_ROW, PIPE_FRAMES, 14.0),
+            Weapon::Knife => (KNIFE_ROW, KNIFE_FRAMES, 12.0),
+            Weapon::Pistol => (PISTOL_ROW, PISTOL_FRAMES, 12.0),
+            Weapon::Rifle => (RIFLE_ROW, RIFLE_FRAMES, 14.0),
+            Weapon::Dead => (DEAD_ROW, DEAD_FRAMES, 14.0),
+        }
+    }
 }
 
 // Структура анимаций
@@ -116,7 +129,7 @@ pub struct Player {
     pub torso_anim: AnimationState,
     pub legs_anim: AnimationState,
     pub is_moving: bool,
-    pub current_weapon: Weapon,
+    pub weapon: Weapon,
     pub ammo: u32,
     pub is_attacking: bool,
     pub is_dead: bool,
@@ -140,7 +153,7 @@ impl Player {
             is_attacking: false,
             is_dead: false,
             atack_radius: 80.0,
-            current_weapon: Weapon::Fists,
+            weapon: Weapon::Fists,
             ammo: 0,
             bullets: Vec::with_capacity(32),
             shoot_cooldown: 0.0,
@@ -149,10 +162,19 @@ impl Player {
     }
 
     pub fn collider(&self) -> Rect {
-        let width = 32.0;
-        let height = 24.0;
+        let width = 36.0;
+        let height = 36.0;
 
-        Rect::new(self.x - width / 2.0, self.y + 12.0, width, height)
+        Rect::new(self.x - width / 2.0, self.y, width, height)
+    }
+
+    pub fn pos(&self) -> Vec2 {
+        vec2(self.x, self.y)
+    }
+
+    pub fn set_pos(&mut self, pos: Vec2) {
+        self.x = pos.x;
+        self.y = pos.y;
     }
 
     pub fn handle_input(
@@ -161,6 +183,7 @@ impl Player {
         world_manager: &WorldManager,
         camera: &Camera2D,
         dropped_weapons: &mut Vec<DroppedWeapon>,
+        assets: &Assets,
     ) {
         if self.is_dead {
             return;
@@ -174,73 +197,61 @@ impl Player {
             {
                 let picked = dropped_weapons.remove(idx);
 
-                if self.current_weapon != Weapon::Fists {
+                if self.weapon != Weapon::Fists {
                     dropped_weapons.push(DroppedWeapon::new(
                         vec2(self.x, self.y),
-                        self.current_weapon,
+                        self.weapon,
                         self.ammo,
                         self.rotation,
                     ));
                 }
 
-                self.current_weapon = picked.weapon;
+                self.weapon = picked.weapon;
                 self.ammo = picked.ammo;
 
-                let row = match self.current_weapon {
-                    Weapon::Pipe => PIPE_ROW,
-                    Weapon::Knight => KNIGHT_ROW,
-                    Weapon::Pistol => PISTOL_ROW,
-                    Weapon::Rifle => RIFLE_ROW,
-                    _ => PUNCH_ROW,
-                };
+                let row = self.weapon.anim_info().0;
+
                 self.torso_anim.set_state(row, 1, 1.0);
-            } else if self.current_weapon != Weapon::Fists {
+            } else if self.weapon != Weapon::Fists {
                 dropped_weapons.push(DroppedWeapon::new(
                     vec2(self.x, self.y),
-                    self.current_weapon,
+                    self.weapon,
                     self.ammo,
                     self.rotation,
                 ));
 
-                self.current_weapon = Weapon::Fists;
+                self.weapon = Weapon::Fists;
                 self.ammo = 0;
                 self.torso_anim.set_state(PUNCH_ROW, 1, 1.0);
             }
         }
 
         if !self.is_attacking {
-            let old_weapon = self.current_weapon;
+            let old_weapon = self.weapon;
 
             if is_key_pressed(KeyCode::Key1) {
-                self.current_weapon = Weapon::Fists;
+                self.weapon = Weapon::Fists;
                 self.ammo = 0;
             }
             if is_key_pressed(KeyCode::Key2) {
-                self.current_weapon = Weapon::Pipe;
+                self.weapon = Weapon::Pipe;
                 self.ammo = 0;
             }
             if is_key_pressed(KeyCode::Key3) {
-                self.current_weapon = Weapon::Knight;
+                self.weapon = Weapon::Knife;
                 self.ammo = 0;
             }
             if is_key_pressed(KeyCode::Key4) {
-                self.current_weapon = Weapon::Pistol;
+                self.weapon = Weapon::Pistol;
                 self.ammo = 12;
             }
             if is_key_pressed(KeyCode::Key5) {
-                self.current_weapon = Weapon::Rifle;
+                self.weapon = Weapon::Rifle;
                 self.ammo = 30;
             }
 
-            if self.current_weapon != old_weapon {
-                let row = match self.current_weapon {
-                    Weapon::Fists => PUNCH_ROW,
-                    Weapon::Pipe => PIPE_ROW,
-                    Weapon::Knight => KNIGHT_ROW,
-                    Weapon::Pistol => PISTOL_ROW,
-                    Weapon::Rifle => RIFLE_ROW,
-                    Weapon::Dead => DEAD_ROW,
-                };
+            if self.weapon != old_weapon {
+                let row = self.weapon.anim_info().0;
                 self.torso_anim.set_state(row, 1, 1.0);
             }
         }
@@ -287,11 +298,10 @@ impl Player {
             self.shoot_cooldown -= delta_time;
         }
 
-        let is_firearm =
-            self.current_weapon == Weapon::Pistol || self.current_weapon == Weapon::Rifle;
+        let is_firearm = self.weapon == Weapon::Pistol || self.weapon == Weapon::Rifle;
         let can_shoot = !is_firearm || self.ammo > 0;
 
-        let attack_triggered = match self.current_weapon {
+        let attack_triggered = match self.weapon {
             Weapon::Rifle => is_mouse_button_down(MouseButton::Left) || is_key_down(KeyCode::E),
             _ => is_mouse_button_pressed(MouseButton::Left) || is_key_pressed(KeyCode::E),
         };
@@ -299,14 +309,11 @@ impl Player {
         if attack_triggered && !self.is_attacking && can_shoot {
             self.is_attacking = true;
 
-            let (row, frames, fps) = match self.current_weapon {
-                Weapon::Fists => (PUNCH_ROW, PUNCH_FRAMES, 14.0),
-                Weapon::Pipe => (PIPE_ROW, PIPE_FRAMES, 14.0),
-                Weapon::Knight => (KNIGHT_ROW, KNIGHT_FRAMES, 12.0),
-                Weapon::Pistol => (PISTOL_ROW, PISTOL_FRAMES, 12.0),
-                Weapon::Rifle => (RIFLE_ROW, RIFLE_FRAMES, 14.0),
-                Weapon::Dead => (DEAD_ROW, DEAD_FRAMES, 14.0),
-            };
+            if !is_firearm {
+                play_sound_once(&assets.sound_swosh);
+            }
+
+            let (row, frames, fps) = self.weapon.anim_info();
             self.torso_anim.set_state(row, frames, fps);
         }
 
@@ -325,20 +332,19 @@ impl Player {
                     self.bullets.push(Bullet::new(vec2(self.x, self.y), dir));
                     self.shoot_cooldown = self.fire_rate;
                     self.ammo = self.ammo.saturating_sub(1);
+
+                    match self.weapon {
+                        Weapon::Rifle => play_sound_once(&assets.sound_ak47),
+                        Weapon::Pistol => play_sound_once(&assets.sound_pistol),
+                        _ => {}
+                    }
                 }
 
                 if keep_shooting {
                     self.torso_anim.reset();
                 } else {
                     self.is_attacking = false;
-                    let row = match self.current_weapon {
-                        Weapon::Fists => PUNCH_ROW,
-                        Weapon::Pipe => PIPE_ROW,
-                        Weapon::Knight => KNIGHT_ROW,
-                        Weapon::Pistol => PISTOL_ROW,
-                        Weapon::Rifle => RIFLE_ROW,
-                        Weapon::Dead => DEAD_ROW,
-                    };
+                    let row = self.weapon.anim_info().0;
                     self.torso_anim.set_state(row, 1, 1.0);
                 }
             }
@@ -363,18 +369,11 @@ impl Player {
     }
 
     pub fn restart(&mut self) {
-        self.x = 0.0;
-        self.y = 0.0;
+        self.x = 650.0;
+        self.y = 650.0;
         self.is_dead = false;
-        self.current_weapon = Weapon::Fists;
-        let (row, frames, fps) = match self.current_weapon {
-            Weapon::Fists => (PUNCH_ROW, PUNCH_FRAMES, 14.0),
-            Weapon::Pipe => (PIPE_ROW, PIPE_FRAMES, 14.0),
-            Weapon::Knight => (KNIGHT_ROW, KNIGHT_FRAMES, 12.0),
-            Weapon::Pistol => (PISTOL_ROW, PISTOL_FRAMES, 12.0),
-            Weapon::Rifle => (RIFLE_ROW, RIFLE_FRAMES, 14.0),
-            Weapon::Dead => (DEAD_ROW, DEAD_FRAMES, 14.0),
-        };
+        self.weapon = Weapon::Fists;
+        let (row, frames, fps) = self.weapon.anim_info();
         self.torso_anim.set_state(row, frames, fps);
     }
 
@@ -401,16 +400,9 @@ impl Player {
     // Отрисовка игрока
     pub fn draw(&mut self, assets: &Assets) {
         if self.is_dead {
-            self.current_weapon = Weapon::Dead;
+            self.weapon = Weapon::Dead;
 
-            let (row, frames, fps) = match self.current_weapon {
-                Weapon::Fists => (PUNCH_ROW, PUNCH_FRAMES, 14.0),
-                Weapon::Pipe => (PIPE_ROW, PIPE_FRAMES, 14.0),
-                Weapon::Knight => (KNIGHT_ROW, KNIGHT_FRAMES, 12.0),
-                Weapon::Pistol => (PISTOL_ROW, PISTOL_FRAMES, 12.0),
-                Weapon::Rifle => (RIFLE_ROW, RIFLE_FRAMES, 14.0),
-                Weapon::Dead => (DEAD_ROW, DEAD_FRAMES, 14.0),
-            };
+            let (row, frames, fps) = self.weapon.anim_info();
             self.torso_anim.set_state(row, frames, fps);
         }
 

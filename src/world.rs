@@ -1,3 +1,4 @@
+use crate::player::Player;
 use crate::tilemap::MapId;
 use crate::tilemap::WorldManager;
 use macroquad::prelude::*;
@@ -12,18 +13,26 @@ pub enum GameState {
 }
 
 // Переключение локаций (при смене переносит игрока в центр новой локации)
-pub fn handle_location_switch(state: &mut GameState, world_manager: &mut WorldManager) {
+pub fn handle_location_switch(
+    state: &mut GameState,
+    world_manager: &mut WorldManager,
+    player: &mut Player,
+) {
     if is_key_pressed(KeyCode::Space) {
         *state = match *state {
             GameState::InApartment => {
                 world_manager.switch_to(MapId::Street);
+                player.x = 200.0;
+                player.y = 200.0;
                 GameState::OnStreet
             }
             GameState::OnStreet => {
                 world_manager.switch_to(MapId::House);
+                player.x = 650.0;
+                player.y = 650.0;
                 GameState::InApartment
             }
-            _ => todo!(),
+            _ => *state,
         };
     }
 }

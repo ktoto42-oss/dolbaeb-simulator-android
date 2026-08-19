@@ -1,128 +1,13 @@
 use crate::assets::Assets;
-use crate::objects::{Bullet, DroppedWeapon};
+use crate::audio::AudioManager;
+use crate::entity::*;
+use crate::objects::{Bullet, BulletOwner, DroppedWeapon, Weapon};
 use crate::tilemap::{TilemapManager, WorldManager};
-use macroquad::audio::play_sound_once;
 use macroquad::prelude::*;
-
-// Настройка спрайтов и смещения центра
-pub const SPRITE_SIZE: f32 = 48.0;
-pub const SCALE: f32 = 2.4;
-pub const SCALED_SIZE: f32 = SPRITE_SIZE * SCALE;
-
-// Сдвиг текстур (тайлсет кривой что пиздец)
-pub const SPRITE_OFFSET_X: f32 = 4.0;
-pub const SPRITE_OFFSET_Y: f32 = 0.0;
-
-// Константы строк и кадров для тайлсета
-// Кулаки
-pub const PUNCH_ROW: usize = 0;
-pub const PUNCH_FRAMES: usize = 7;
-
-// Труба
-pub const PIPE_ROW: usize = 1;
-pub const PIPE_FRAMES: usize = 7;
-
-// Нож
-pub const KNIFE_ROW: usize = 2;
-pub const KNIFE_FRAMES: usize = 5;
-
-// Пистолет
-pub const PISTOL_ROW: usize = 3;
-pub const PISTOL_FRAMES: usize = 2;
-
-// Автомат
-pub const RIFLE_ROW: usize = 4;
-pub const RIFLE_FRAMES: usize = 2;
-
-// Ноги
-pub const LEGS_ROW: usize = 5;
-pub const LEGS_FRAMES: usize = 7;
-
-pub const DEAD_ROW: usize = 6;
-pub const DEAD_FRAMES: usize = 1;
-
-// Всё оружие
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Weapon {
-    Fists,
-    Pipe,
-    Knife,
-    Pistol,
-    Rifle,
-    Dead,
-}
-
-impl Weapon {
-    pub fn anim_info(&self) -> (usize, usize, f32) {
-        match self {
-            Weapon::Fists => (PUNCH_ROW, PUNCH_FRAMES, 14.0),
-            Weapon::Pipe => (PIPE_ROW, PIPE_FRAMES, 14.0),
-            Weapon::Knife => (KNIFE_ROW, KNIFE_FRAMES, 12.0),
-            Weapon::Pistol => (PISTOL_ROW, PISTOL_FRAMES, 12.0),
-            Weapon::Rifle => (RIFLE_ROW, RIFLE_FRAMES, 14.0),
-            Weapon::Dead => (DEAD_ROW, DEAD_FRAMES, 14.0),
-        }
-    }
-}
-
-// Структура анимаций
-pub struct AnimationState {
-    pub current_frame: usize,
-    frame_timer: f32,
-    frame_delay: f32,
-    pub num_frames: usize,
-    pub row_index: f32,
-}
-
-impl AnimationState {
-    pub fn new(num_frames: usize, fps: f32, row_index: usize) -> Self {
-        Self {
-            current_frame: 0,
-            frame_timer: 0.0,
-            frame_delay: 1.0 / fps,
-            num_frames,
-            row_index: row_index as f32,
-        }
-    }
-
-    pub fn update(&mut self, dt: f32) -> bool {
-        if self.num_frames <= 1 {
-            return false;
-        }
-
-        self.frame_timer += dt;
-        if self.frame_timer >= self.frame_delay {
-            self.frame_timer -= self.frame_delay;
-            let next_frame = self.current_frame + 1;
-
-            if next_frame >= self.num_frames {
-                self.current_frame = 0;
-                return true;
-            } else {
-                self.current_frame = next_frame;
-            }
-        }
-        false
-    }
-
-    pub fn set_state(&mut self, row: usize, num_frames: usize, fps: f32) {
-        self.row_index = row as f32;
-        self.num_frames = num_frames;
-        self.frame_delay = 1.0 / fps;
-        self.current_frame = 0;
-        self.frame_timer = 0.0;
-    }
-
-    pub fn reset(&mut self) {
-        self.current_frame = 0;
-        self.frame_timer = 0.0;
-    }
-}
 
 // Структура игрока
 pub struct Player {
-    pub x: f32,
-    pub y: f32,
+    pub pos: Vec2,
     pub speed: f32,
     pub rotation: f32,
     pub legs_rotation: f32,
@@ -133,17 +18,14 @@ pub struct Player {
     pub ammo: u32,
     pub is_attacking: bool,
     pub is_dead: bool,
-    pub atack_radius: f32,
-    pub bullets: Vec<Bullet>,
     pub shoot_cooldown: f32,
-    pub fire_rate: f32,
+    pub atack_timer: f32,
 }
 
 impl Player {
-    pub fn new(x: f32, y: f32, speed: f32) -> Self {
+    pub fn new(pos: Vec2, speed: f32) -> Self {
         Self {
-            x,
-            y,
+            pos,
             speed,
             rotation: 0.0,
             legs_rotation: 0.0,
@@ -152,29 +34,15 @@ impl Player {
             is_moving: false,
             is_attacking: false,
             is_dead: false,
-            atack_radius: 80.0,
             weapon: Weapon::Fists,
             ammo: 0,
-            bullets: Vec::with_capacity(32),
             shoot_cooldown: 0.0,
-            fire_rate: 0.15,
+            atack_timer: 0.0,
         }
     }
 
     pub fn collider(&self) -> Rect {
-        let width = 36.0;
-        let height = 36.0;
-
-        Rect::new(self.x - width / 2.0, self.y, width, height)
-    }
-
-    pub fn pos(&self) -> Vec2 {
-        vec2(self.x, self.y)
-    }
-
-    pub fn set_pos(&mut self, pos: Vec2) {
-        self.x = pos.x;
-        self.y = pos.y;
+        get_collider(&self.pos)
     }
 
     pub fn handle_input(
@@ -183,23 +51,24 @@ impl Player {
         world_manager: &WorldManager,
         camera: &Camera2D,
         dropped_weapons: &mut Vec<DroppedWeapon>,
-        assets: &Assets,
+        bullets: &mut Vec<Bullet>,
+        audio: &AudioManager,
+        last_shot_pos: &mut Option<Vec2>,
     ) {
         if self.is_dead {
             return;
         }
 
         if is_mouse_button_pressed(MouseButton::Right) {
-            let player_rect = self.collider();
             if let Some(idx) = dropped_weapons
                 .iter()
-                .position(|w| w.collider().overlaps(&player_rect))
+                .position(|w| w.collider().overlaps(&self.collider()))
             {
                 let picked = dropped_weapons.remove(idx);
 
                 if self.weapon != Weapon::Fists {
                     dropped_weapons.push(DroppedWeapon::new(
-                        vec2(self.x, self.y),
+                        self.pos,
                         self.weapon,
                         self.ammo,
                         self.rotation,
@@ -214,7 +83,7 @@ impl Player {
                 self.torso_anim.set_state(row, 1, 1.0);
             } else if self.weapon != Weapon::Fists {
                 dropped_weapons.push(DroppedWeapon::new(
-                    vec2(self.x, self.y),
+                    self.pos,
                     self.weapon,
                     self.ammo,
                     self.rotation,
@@ -274,19 +143,8 @@ impl Player {
 
         if self.is_moving {
             move_vec = move_vec.normalize();
-            let old_x = self.x;
-            let old_y = self.y;
-            let active_map = world_manager.get_active();
-
-            self.x += move_vec.x * self.speed * delta_time;
-            if active_map.check_collision(self.collider()) {
-                self.x = old_x;
-            }
-
-            self.y += move_vec.y * self.speed * delta_time;
-            if active_map.check_collision(self.collider()) {
-                self.y = old_y;
-            }
+            let delta = move_vec * self.speed * delta_time;
+            move_char(&mut self.pos, delta, world_manager.get_active());
 
             self.legs_rotation = move_vec.y.atan2(move_vec.x);
             self.legs_anim.update(delta_time);
@@ -302,15 +160,16 @@ impl Player {
         let can_shoot = !is_firearm || self.ammo > 0;
 
         let attack_triggered = match self.weapon {
-            Weapon::Rifle => is_mouse_button_down(MouseButton::Left) || is_key_down(KeyCode::E),
-            _ => is_mouse_button_pressed(MouseButton::Left) || is_key_pressed(KeyCode::E),
+            Weapon::Rifle => is_mouse_button_down(MouseButton::Left),
+            _ => is_mouse_button_pressed(MouseButton::Left),
         };
 
         if attack_triggered && !self.is_attacking && can_shoot {
             self.is_attacking = true;
 
             if !is_firearm {
-                play_sound_once(&assets.sound_swosh);
+                self.atack_timer = MELEE_ATACK_TIME;
+                audio.play(&audio.sound_swosh);
             }
 
             let (row, frames, fps) = self.weapon.anim_info();
@@ -327,15 +186,22 @@ impl Player {
                 if is_firearm && self.ammo > 0 {
                     let mouse_world =
                         camera.screen_to_world(vec2(mouse_position().0, mouse_position().1));
-                    let dir = mouse_world - vec2(self.x, self.y);
+                    let dir = mouse_world - self.pos;
 
-                    self.bullets.push(Bullet::new(vec2(self.x, self.y), dir));
-                    self.shoot_cooldown = self.fire_rate;
+                    bullets.push(Bullet::new(self.pos, dir, BulletOwner::Player));
+                    *last_shot_pos = Some(self.pos);
+
+                    self.shoot_cooldown = match self.weapon {
+                        Weapon::Rifle => RIFLE_CD,
+                        Weapon::Pistol => PISTOL_CD,
+                        _ => 0.0,
+                    };
+
                     self.ammo = self.ammo.saturating_sub(1);
 
                     match self.weapon {
-                        Weapon::Rifle => play_sound_once(&assets.sound_ak47),
-                        Weapon::Pistol => play_sound_once(&assets.sound_pistol),
+                        Weapon::Rifle => audio.play(&audio.sound_ak47),
+                        Weapon::Pistol => audio.play(&audio.sound_pistol),
                         _ => {}
                     }
                 }
@@ -355,7 +221,7 @@ impl Player {
         if !self.is_dead {
             let mouse_screen = mouse_position();
             let mouse_world = camera.screen_to_world(vec2(mouse_screen.0, mouse_screen.1));
-            let direction = mouse_world - vec2(self.x, self.y);
+            let direction = mouse_world - self.pos;
 
             self.rotation = direction.y.atan2(direction.x);
         }
@@ -364,93 +230,43 @@ impl Player {
     // Ограничение локаций
     pub fn location_restriction(&mut self, active_map: &TilemapManager) {
         let bounds = active_map.bounds();
-        self.x = self.x.clamp(0.0, bounds.w);
-        self.y = self.y.clamp(0.0, bounds.h);
+        self.pos.x = self.pos.x.clamp(0.0, bounds.w);
+        self.pos.y = self.pos.y.clamp(0.0, bounds.h);
     }
 
-    pub fn restart(&mut self) {
-        self.x = 650.0;
-        self.y = 650.0;
-        self.is_dead = false;
-        self.weapon = Weapon::Fists;
-        let (row, frames, fps) = self.weapon.anim_info();
-        self.torso_anim.set_state(row, frames, fps);
+    pub fn restart(&mut self, pos: Vec2) {
+        let weapon = Weapon::Fists;
+        restart_char(
+            &mut self.pos,
+            pos,
+            &mut self.is_dead,
+            &mut self.weapon,
+            weapon,
+            &mut self.torso_anim,
+        );
     }
 
-    // Обновление пуль
-    pub fn update_bullets(&mut self, active_map: &TilemapManager, delta_time: f32) {
-        self.bullets.retain_mut(|bullet| {
-            bullet.update(delta_time);
-
-            if bullet.lifetime <= 0.0 || active_map.check_collision(bullet.collider()) {
-                return false;
-            }
-
-            true
-        });
-    }
-
-    // Отрисовка пуль
-    pub fn draw_bullets(&self) {
-        for bullet in &self.bullets {
-            bullet.draw();
-        }
+    pub fn die(&mut self, dropped_weapons: &mut Vec<DroppedWeapon>) {
+        char_die(
+            self.pos,
+            self.rotation,
+            &mut self.is_dead,
+            &mut self.weapon,
+            &mut self.torso_anim,
+            dropped_weapons,
+        );
     }
 
     // Отрисовка игрока
     pub fn draw(&mut self, assets: &Assets) {
-        if self.is_dead {
-            self.weapon = Weapon::Dead;
-
-            let (row, frames, fps) = self.weapon.anim_info();
-            self.torso_anim.set_state(row, frames, fps);
-        }
-
-        let half_scaled_size = SCALED_SIZE / 2.0;
-        let visual_offset_x = SPRITE_OFFSET_X * SCALE;
-        let visual_offset_y = SPRITE_OFFSET_Y * SCALE;
-
-        // Отрисовка ног
-        if !self.is_dead {
-            let legs_src_x = self.legs_anim.current_frame as f32 * SPRITE_SIZE;
-            let legs_src_y = self.legs_anim.row_index * SPRITE_SIZE;
-
-            draw_texture_ex(
-                &assets.player,
-                self.x - half_scaled_size,
-                self.y - half_scaled_size,
-                WHITE,
-                DrawTextureParams {
-                    dest_size: Some(vec2(SCALED_SIZE, SCALED_SIZE)),
-                    source: Some(Rect::new(legs_src_x, legs_src_y, SPRITE_SIZE, SPRITE_SIZE)),
-                    rotation: self.legs_rotation,
-                    pivot: Some(vec2(self.x, self.y)),
-                    ..Default::default()
-                },
-            );
-        }
-
-        // Отрисовка торса
-        let torso_src_x = self.torso_anim.current_frame as f32 * SPRITE_SIZE;
-        let torso_src_y = self.torso_anim.row_index * SPRITE_SIZE;
-
-        draw_texture_ex(
+        draw_char(
             &assets.player,
-            self.x - half_scaled_size + visual_offset_x,
-            self.y - half_scaled_size + visual_offset_y,
-            WHITE,
-            DrawTextureParams {
-                dest_size: Some(vec2(SCALED_SIZE, SCALED_SIZE)),
-                source: Some(Rect::new(
-                    torso_src_x,
-                    torso_src_y,
-                    SPRITE_SIZE,
-                    SPRITE_SIZE,
-                )),
-                rotation: self.rotation,
-                pivot: Some(vec2(self.x, self.y)),
-                ..Default::default()
-            },
+            self.pos,
+            self.rotation,
+            self.legs_rotation,
+            &self.torso_anim,
+            &self.legs_anim,
+            self.is_dead,
         );
     }
 }

@@ -1,4 +1,3 @@
-use macroquad::audio::{Sound, load_sound_from_bytes};
 use macroquad::prelude::*;
 
 // Структура Ассетов
@@ -11,15 +10,10 @@ pub struct Assets {
     pub font_press_start_2p: Font,
     pub font_times_new_roman: Font,
     pub font_tiny5: Font,
-    pub sound_ak47: Sound,
-    pub sound_knife: Sound,
-    pub sound_pipe: Sound,
-    pub sound_pistol: Sound,
-    pub sound_swosh: Sound,
 }
 
 impl Assets {
-    pub async fn load() -> Self {
+    pub fn load() -> Self {
         // Загрузка текстур
         let player_bytes = include_bytes!("../assets/player_tileset.png");
         let phone_bytes = include_bytes!("../assets/phone.png");
@@ -44,23 +38,6 @@ impl Assets {
         let font_tiny5_bytes = include_bytes!("../assets/font_tiny5.ttf");
         let font_tiny5 = load_ttf_font_from_bytes(font_tiny5_bytes).unwrap();
 
-        // Загрузка звуков
-        let sound_ak47 = load_sound_from_bytes(include_bytes!("../assets/ak47.wav"))
-            .await
-            .unwrap();
-        let sound_knife = load_sound_from_bytes(include_bytes!("../assets/knife.wav"))
-            .await
-            .unwrap();
-        let sound_pipe = load_sound_from_bytes(include_bytes!("../assets/pipe.wav"))
-            .await
-            .unwrap();
-        let sound_pistol = load_sound_from_bytes(include_bytes!("../assets/pistol.wav"))
-            .await
-            .unwrap();
-        let sound_swosh = load_sound_from_bytes(include_bytes!("../assets/swosh.wav"))
-            .await
-            .unwrap();
-
         // Отключение размытия для пиксель арта
         player.set_filter(FilterMode::Nearest);
         phone.set_filter(FilterMode::Nearest);
@@ -76,11 +53,6 @@ impl Assets {
             font_press_start_2p,
             font_times_new_roman,
             font_tiny5,
-            sound_ak47,
-            sound_knife,
-            sound_pipe,
-            sound_pistol,
-            sound_swosh,
         }
     }
 

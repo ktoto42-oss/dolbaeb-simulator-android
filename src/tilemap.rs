@@ -5,12 +5,10 @@ use std::collections::BinaryHeap;
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum MapId {
     House = 0,
-    Street = 1,
-    //Level1_1 = 2,
-    //Level1_2 = 3,
-    //Level2_1 = 4,
-    //Level2_2 = 5,
-    //Level2_3 = 6,
+    Level1_1 = 1,
+    Level1_2 = 2,
+    Level2_1 = 3,
+    Level2_2 = 4,
 }
 
 struct MapConfig {
@@ -127,6 +125,7 @@ impl TilemapManager {
             last_target_tile: (usize::MAX, usize::MAX),
         }
     }
+
     pub fn update_flow_field(&mut self, target_pos: Vec2) {
         if self.collision_grid.is_empty() {
             return;
@@ -323,7 +322,7 @@ impl TilemapManager {
 
 pub struct WorldManager {
     maps: [Option<TilemapManager>; 2],
-    current_map: MapId,
+    pub current_map: MapId,
 }
 
 const CONFIGS: [MapConfig; 2] = [
@@ -337,13 +336,13 @@ const CONFIGS: [MapConfig; 2] = [
         tile_h: 16.0,
     },
     MapConfig {
-        json_str: include_str!("../assets/street.json"),
+        json_str: include_str!("../assets/level1_1.json"),
         atlas_bytes: include_bytes!("../assets/tileset.png"),
-        texture_bytes: include_bytes!("../assets/street.png"),
-        width: 200,
-        height: 200,
-        tile_w: 48.0,
-        tile_h: 48.0,
+        texture_bytes: include_bytes!("../assets/level1_1.png"),
+        width: 60,
+        height: 30,
+        tile_w: 16.0,
+        tile_h: 16.0,
     },
 ];
 

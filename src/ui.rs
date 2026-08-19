@@ -1,5 +1,6 @@
 use crate::assets::Assets;
-use crate::player::{Player, Weapon};
+use crate::objects::Weapon;
+use crate::player::Player;
 use macroquad::prelude::*;
 
 // Отрисовка главного меню
@@ -53,7 +54,13 @@ pub fn draw_main_menu(assets: &Assets, selected_idx: usize, font_idx: usize) {
 }
 
 // Отрисовка меню настроек
-pub fn draw_settings_menu(assets: &Assets, selected_idx: usize, font_idx: usize, fullscreen: bool) {
+pub fn draw_settings_menu(
+    assets: &Assets,
+    selected_idx: usize,
+    font_idx: usize,
+    fullscreen: bool,
+    volume_percent: f32,
+) {
     // Фиксация камеры
     set_default_camera();
     // Отчистка фона
@@ -82,6 +89,7 @@ pub fn draw_settings_menu(assets: &Assets, selected_idx: usize, font_idx: usize,
     let options = [
         format!("SCREEN MODE: {}", screen_str),
         format!("FONT: {}", font_name),
+        format!("VOLUME: {}%", volume_percent),
         "BACK".to_string(),
     ];
 

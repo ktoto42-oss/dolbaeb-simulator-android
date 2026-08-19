@@ -8,7 +8,7 @@
 ### Установка и запуск
 
    ```bash
-   git clone https:://github.com/sosaltix-studio/dolbaeb-simulator
+   git clone https://github.com/sosaltix-studio/dolbaeb-simulator
 
    cd dolbaeb-simulator
    
@@ -18,7 +18,7 @@
 ### Запуск в браузере
 
    ```bash
-   git clone https:://github.com/sosaltix-studio/dolbaeb-simulator
+   git clone https://github.com/sosaltix-studio/dolbaeb-simulator
 
    cd dolbaeb-simulator
 

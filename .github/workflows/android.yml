@@ -30,6 +30,11 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      - name: Install Android Platform API 29
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-29"
+
       - name: Install cargo-quad-apk
         run: cargo install cargo-quad-apk
 

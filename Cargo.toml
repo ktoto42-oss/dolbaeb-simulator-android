@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 macroquad = { version = "0.4.16", features = ["audio"] }
 serde = { version = "1.0", features = ["derive"] }
+fontdue = "=0.9.2"
 serde_json = "1.0"
 
 [profile.release]
@@ -22,6 +23,3 @@ opt-level = 3
 package_name = "com.dolbaeb.simulator"
 label = "Dolbaeb Simulator"
 build_targets = ["aarch64-linux-android"]
-
-[patch.crates-io]
-fontdue = "=0.9.2"

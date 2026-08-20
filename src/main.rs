@@ -1,3 +1,4 @@
+use crate::control::ControlsManager;
 use crate::enemy::Enemy;
 use crate::objects::{Bullet, DroppedWeapon, Weapon};
 use crate::player::Player;
@@ -29,6 +30,8 @@ mod tilemap;
 mod entity;
 
 mod audio;
+
+mod control;
 
 fn window_conf() -> Conf {
     Conf {
@@ -73,6 +76,8 @@ async fn main() {
     let mut last_shot_pos: Option<Vec2> = None;
 
     let mut phone_read = false;
+
+    let mut control = ControlsManager::new();
 
     // Состояния меню и настроек
     let mut state = GameState::MainMenu;
@@ -276,6 +281,8 @@ async fn main() {
 
                 // Обновление игры
                 if !is_paused {
+                    let input = control.update(&camera, player.pos);
+
                     player.handle_input(
                         delta_time,
                         &world_manager,
@@ -284,6 +291,7 @@ async fn main() {
                         &mut bullets,
                         &audio,
                         &mut last_shot_pos,
+                        &input,
                     );
 
                     player.update_rotation(&camera);
@@ -354,6 +362,7 @@ async fn main() {
 
                 // Статичный интерфейс
                 ui::draw_ui(&assets, font_idx, &player);
+                control.draw();
                 phone.draw(&assets, font_idx);
 
                 if player.is_dead {

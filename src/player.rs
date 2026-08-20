@@ -1,5 +1,6 @@
 use crate::assets::Assets;
 use crate::audio::AudioManager;
+use crate::control::InputState;
 use crate::entity::*;
 use crate::objects::{Bullet, BulletOwner, DroppedWeapon, Weapon};
 use crate::tilemap::{TilemapManager, WorldManager};
@@ -54,12 +55,13 @@ impl Player {
         bullets: &mut Vec<Bullet>,
         audio: &AudioManager,
         last_shot_pos: &mut Option<Vec2>,
+        input: &InputState,
     ) {
         if self.is_dead {
             return;
         }
 
-        if is_mouse_button_pressed(MouseButton::Right) {
+        if input.pickup_triggered {
             if let Some(idx) = dropped_weapons
                 .iter()
                 .position(|w| w.collider().overlaps(&self.collider()))
@@ -75,6 +77,7 @@ impl Player {
                     ));
                 }
 
+                self.is_attacking = false;
                 self.weapon = picked.weapon;
                 self.ammo = picked.ammo;
 
@@ -89,67 +92,27 @@ impl Player {
                     self.rotation,
                 ));
 
+                self.is_attacking = false;
                 self.weapon = Weapon::Fists;
                 self.ammo = 0;
                 self.torso_anim.set_state(PUNCH_ROW, 1, 1.0);
             }
         }
 
-        if !self.is_attacking {
-            let old_weapon = self.weapon;
-
-            if is_key_pressed(KeyCode::Key1) {
-                self.weapon = Weapon::Fists;
-                self.ammo = 0;
-            }
-            if is_key_pressed(KeyCode::Key2) {
-                self.weapon = Weapon::Pipe;
-                self.ammo = 0;
-            }
-            if is_key_pressed(KeyCode::Key3) {
-                self.weapon = Weapon::Knife;
-                self.ammo = 0;
-            }
-            if is_key_pressed(KeyCode::Key4) {
-                self.weapon = Weapon::Pistol;
-                self.ammo = 12;
-            }
-            if is_key_pressed(KeyCode::Key5) {
-                self.weapon = Weapon::Rifle;
-                self.ammo = 30;
-            }
-
-            if self.weapon != old_weapon {
-                let row = self.weapon.anim_info().0;
-                self.torso_anim.set_state(row, 1, 1.0);
-            }
-        }
-
-        let mut move_vec = vec2(0.0, 0.0);
-        if is_key_down(KeyCode::W) {
-            move_vec.y -= 1.0;
-        }
-        if is_key_down(KeyCode::S) {
-            move_vec.y += 1.0;
-        }
-        if is_key_down(KeyCode::A) {
-            move_vec.x -= 1.0;
-        }
-        if is_key_down(KeyCode::D) {
-            move_vec.x += 1.0;
-        }
-
-        self.is_moving = move_vec != vec2(0.0, 0.0);
+        self.is_moving = input.move_vec != vec2(0.0, 0.0);
 
         if self.is_moving {
-            move_vec = move_vec.normalize();
-            let delta = move_vec * self.speed * delta_time;
+            let delta = input.move_vec * self.speed * delta_time;
             move_char(&mut self.pos, delta, world_manager.get_active());
 
-            self.legs_rotation = move_vec.y.atan2(move_vec.x);
+            self.legs_rotation = input.move_vec.y.atan2(input.move_vec.x);
             self.legs_anim.update(delta_time);
         } else {
             self.legs_anim.reset();
+        }
+
+        if input.aim_dir != Vec2::ZERO {
+            self.rotation = input.aim_dir.y.atan2(input.aim_dir.x);
         }
 
         if self.shoot_cooldown > 0.0 {
@@ -159,12 +122,7 @@ impl Player {
         let is_firearm = self.weapon == Weapon::Pistol || self.weapon == Weapon::Rifle;
         let can_shoot = !is_firearm || self.ammo > 0;
 
-        let attack_triggered = match self.weapon {
-            Weapon::Rifle => is_mouse_button_down(MouseButton::Left),
-            _ => is_mouse_button_pressed(MouseButton::Left),
-        };
-
-        if attack_triggered && !self.is_attacking && can_shoot {
+        if input.attack_triggered && !self.is_attacking && can_shoot {
             self.is_attacking = true;
 
             if !is_firearm {

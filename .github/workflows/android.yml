@@ -18,11 +18,11 @@ jobs:
         with:
           targets: aarch64-linux-android
 
-      - name: Setup NDK r21e
+      - name: Setup NDK
         uses: nttld/setup-ndk@v1
         id: setup-ndk
         with:
-          ndk-version: r21e
+          ndk-version: r26b
 
       - name: Setup Java JDK
         uses: actions/setup-java@v4
@@ -30,19 +30,13 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Install Android Platform API 29
-        run: |
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-29"
-
       - name: Install cargo-quad-apk
         run: cargo install cargo-quad-apk
 
       - name: Build APK
         env:
-          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+          ANDROID_NDK_ROOT: ${{ steps.setup-ndk.outputs.ndk-path }}
           NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
-          RUSTFLAGS: "-C linker=${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android29-clang"
         run: cargo quad-apk build --release
 
       - name: Upload APK Artifact

@@ -13,12 +13,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Build APK via Official Macroquad Docker Container
+      - name: Build APK via Docker
         run: |
           docker run --rm \
             -v ${{ github.workspace }}:/root/src \
             -w /root/src \
-            notfl3/cargo-apk cargo quad-apk build --release
+            notfl3/cargo-apk /bin/bash -c "rm -f Cargo.lock && cargo quad-apk build --release"
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4

@@ -40,13 +40,17 @@ jobs:
 
       - name: Patch NDK Linker Wrapper
         run: |
-          NDK_BIN="${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          UNWIND_DIR="${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/lib64/clang/9.0.8/lib/linux/aarch64"
+          NDK_PATH="${{ steps.setup-ndk.outputs.ndk-path }}"
+          NDK_BIN="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin"
           
-          # Сохраняем оригинальный ld.lld и перехватываем aarch64-linux-android-ld
+          # Автоматически находим точную папку, где лежит libunwind.a
+          UNWIND_PATH=$(find "$NDK_PATH" -name "libunwind.a" -exec dirname {} \; | head -n 1)
+          echo "Found libunwind at: $UNWIND_PATH"
+          
+          # Заменяем aarch64-linux-android-ld на вызов ld.lld с правильным путем
           mv $NDK_BIN/aarch64-linux-android-ld $NDK_BIN/aarch64-linux-android-ld.orig
           echo "#!/bin/sh" > $NDK_BIN/aarch64-linux-android-ld
-          echo "$NDK_BIN/ld.lld -L$UNWIND_DIR \"\$@\"" >> $NDK_BIN/aarch64-linux-android-ld
+          echo "$NDK_BIN/ld.lld -L$UNWIND_PATH \"\$@\"" >> $NDK_BIN/aarch64-linux-android-ld
           chmod +x $NDK_BIN/aarch64-linux-android-ld
 
       - name: Build APK

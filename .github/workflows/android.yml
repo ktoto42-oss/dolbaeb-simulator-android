@@ -43,11 +43,15 @@ jobs:
           NDK_PATH="${{ steps.setup-ndk.outputs.ndk-path }}"
           NDK_BIN="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin"
           
-          # Автоматически находим точную папку, где лежит libunwind.a
-          UNWIND_PATH=$(find "$NDK_PATH" -name "libunwind.a" -exec dirname {} \; | head -n 1)
-          echo "Found libunwind at: $UNWIND_PATH"
+          # Находим точный путь к 64-битной версии libunwind.a (arm64-v8a или aarch64)
+          UNWIND_PATH=$(find "$NDK_PATH" -path "*/arm64-v8a/*" -name "libunwind.a" -exec dirname {} \; | head -n 1)
+          if [ -z "$UNWIND_PATH" ]; then
+            UNWIND_PATH=$(find "$NDK_PATH" -path "*/aarch64/*" -name "libunwind.a" -exec dirname {} \; | head -n 1)
+          fi
           
-          # Заменяем aarch64-linux-android-ld на вызов ld.lld с правильным путем
+          echo "Targeting 64-bit libunwind at: $UNWIND_PATH"
+          
+          # Заменяем aarch64-linux-android-ld на подставной скрипт
           mv $NDK_BIN/aarch64-linux-android-ld $NDK_BIN/aarch64-linux-android-ld.orig
           echo "#!/bin/sh" > $NDK_BIN/aarch64-linux-android-ld
           echo "$NDK_BIN/ld.lld -L$UNWIND_PATH \"\$@\"" >> $NDK_BIN/aarch64-linux-android-ld

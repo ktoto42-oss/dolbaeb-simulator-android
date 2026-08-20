@@ -18,11 +18,11 @@ jobs:
         with:
           targets: aarch64-linux-android
 
-      - name: Setup NDK
+      - name: Setup NDK r21e
         uses: nttld/setup-ndk@v1
         id: setup-ndk
         with:
-          ndk-version: r25c
+          ndk-version: r21e
 
       - name: Install cargo-quad-apk
         run: cargo install cargo-quad-apk

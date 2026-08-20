@@ -19,9 +19,6 @@ strip = true
 opt-level = 3
 
 [package.metadata.android]
-package_name = "com.sosaltix-studio.dolbaebsimulator"
+package_name = "com.dolbaeb.simulator"
 label = "Dolbaeb Simulator"
-assets = "assets"
 build_targets = ["aarch64-linux-android"]
-min_sdk_version = 21
-target_sdk_version = 33

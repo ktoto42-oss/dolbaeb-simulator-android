@@ -18,14 +18,11 @@ jobs:
         with:
           targets: aarch64-linux-android
 
-      - name: Setup NDK r21e
+      - name: Setup NDK r25c
         uses: nttld/setup-ndk@v1
         id: setup-ndk
         with:
-          ndk-version: r21e
-
-      - name: Install cargo-quad-apk
-        run: cargo install cargo-quad-apk
+          ndk-version: r25c
 
       - name: Setup Java JDK
         uses: actions/setup-java@v4
@@ -33,20 +30,16 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Install Android Platform API 29
-        run: |
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-29"
+      - name: Install cargo-apk
+        run: cargo install cargo-apk
 
       - name: Build APK
         env:
-          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
-          NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
-          RUSTFLAGS: "-C link-arg=-L${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/lib64/clang/9.0.8/lib/linux/aarch64"
-        run: cargo quad-apk build --release
+          ANDROID_NDK_ROOT: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: cargo apk build --release
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: dolbaeb-simulator-apk
-          path: target/android-artifacts/release/apk/*.apk
+          path: target/release/apk/*.apk

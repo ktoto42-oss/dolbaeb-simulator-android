@@ -1,5 +1,5 @@
 [package]
-name = "dolbaeb-simulator"
+name = "dolbaeb_simulator"
 version = "0.1.1"
 edition = "2021"
 
@@ -20,7 +20,7 @@ strip = true
 opt-level = 3
 
 [package.metadata.android]
-package_name = "com.dolbaeb.simulator"
+package_name = "com.dolbaeb.dolbaeb_simulator"
 label = "Dolbaeb Simulator"
 build_targets = ["aarch64-linux-android"]
 target_sdk_version = 30

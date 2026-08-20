@@ -13,47 +13,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: aarch64-linux-android
-
-      - name: Setup NDK r21e
-        uses: nttld/setup-ndk@v1
-        id: setup-ndk
-        with:
-          ndk-version: r21e
-
-      - name: Setup Java JDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Install Android Platform API 29
+      - name: Build APK via Official Macroquad Docker Container
         run: |
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-29"
-
-      - name: Install cargo-quad-apk
-        run: cargo install cargo-quad-apk
-
-      - name: Patch NDK Linker Wrapper
-        run: |
-          NDK_PATH="${{ steps.setup-ndk.outputs.ndk-path }}"
-          NDK_BIN="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          UNWIND_PATH="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/lib64/clang/9.0.8/lib/linux/aarch64"
-          
-          mv $NDK_BIN/aarch64-linux-android-ld $NDK_BIN/aarch64-linux-android-ld.orig
-          echo "#!/bin/sh" > $NDK_BIN/aarch64-linux-android-ld
-          echo "$NDK_BIN/ld.lld -L$UNWIND_PATH \"\$@\"" >> $NDK_BIN/aarch64-linux-android-ld
-          chmod +x $NDK_BIN/aarch64-linux-android-ld
-
-      - name: Build APK
-        env:
-          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
-          NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
-        run: cargo quad-apk build --release
+          docker run --rm \
+            -v ${{ github.workspace }}:/root/src \
+            -w /root/src \
+            notfl3/cargo-apk cargo quad-apk build --release
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4

@@ -18,11 +18,11 @@ jobs:
         with:
           targets: aarch64-linux-android
 
-      - name: Setup NDK
+      - name: Setup NDK r21e
         uses: nttld/setup-ndk@v1
         id: setup-ndk
         with:
-          ndk-version: r26b
+          ndk-version: r21e
 
       - name: Setup Java JDK
         uses: actions/setup-java@v4
@@ -38,9 +38,20 @@ jobs:
       - name: Install cargo-quad-apk
         run: cargo install cargo-quad-apk
 
+      - name: Patch NDK Linker Wrapper
+        run: |
+          NDK_BIN="${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          UNWIND_DIR="${{ steps.setup-ndk.outputs.ndk-path }}/toolchains/llvm/prebuilt/linux-x86_64/lib64/clang/9.0.8/lib/linux/aarch64"
+          
+          # Сохраняем оригинальный ld.lld и перехватываем aarch64-linux-android-ld
+          mv $NDK_BIN/aarch64-linux-android-ld $NDK_BIN/aarch64-linux-android-ld.orig
+          echo "#!/bin/sh" > $NDK_BIN/aarch64-linux-android-ld
+          echo "$NDK_BIN/ld.lld -L$UNWIND_DIR \"\$@\"" >> $NDK_BIN/aarch64-linux-android-ld
+          chmod +x $NDK_BIN/aarch64-linux-android-ld
+
       - name: Build APK
         env:
-          ANDROID_NDK_ROOT: ${{ steps.setup-ndk.outputs.ndk-path }}
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
           NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
         run: cargo quad-apk build --release
 
